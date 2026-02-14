@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard - EchoBridge</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: 'Inter', Arial, sans-serif;
+            padding: 40px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid #334155;
+        }
+
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #e2e8f0;
+        }
+
+        .emotion-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .emotion-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #0f172a;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+
+        .emotion-name {
+            font-size: 16px;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .emotion-info {
+            text-align: right;
+        }
+
+        .confidence {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .timestamp {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+
+        .nav-links {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #334155;
+        }
+
+        .nav-links a {
+            color: #94a3b8;
+            text-decoration: none;
+            margin-right: 20px;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Welcome, {{ session.username }}!</h1>
+    <p class="subtitle">Your emotion analytics and history</p>
+
+    <div class="dashboard-grid">
+        <!-- Emotion History -->
+        <div class="card">
+            <h2>Your Recent Emotions</h2>
+            {% if emotions %}
+                <div class="emotion-list">
+                    {% for item in emotions %}
+                        <div class="emotion-item">
+                            <span class="emotion-name">{{ item.emotion }}</span>
+                            <div class="emotion-info">
+                                <div class="confidence">{{ "%.1f"|format(item.confidence) }}%</div>
+                                <div class="timestamp">{{ item.created_at }}</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <p>No emotion data yet.</p>
+                    <p>Start by detecting your emotion!</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Emotion Chart -->
+        <div class="card">
+            <h2>Emotion Distribution</h2>
+            <div class="chart-container">
+                <canvas id="emotionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav-links">
+        <a href="{{ url_for('index') }}">← Back to Home</a>
+        <a href="{{ url_for('auto') }}">Auto Detection</a>
+        <a href="{{ url_for('manual') }}">Manual Selection</a>
+        <a href="#" onclick="findMatch(); return false;">Find Match</a>
+        <a href="{{ url_for('ai_chat_page') }}">Talk to AI</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+
+    {% if emotions %}
+    <script>
+        // Prepare emotion data for chart
+        const emotionData = {};
+        {% for item in emotions %}
+        (function() {
+            var emotion = "{{ item.emotion }}";
+            emotionData[emotion] = (emotionData[emotion] || 0) + 1;
+        })();
+        {% endfor %}
+
+        var labels = Object.keys(emotionData);
+        var data = Object.values(emotionData);
+
+        // Chart colors
+        var colors = {
+            'happy': '#4ade80',
+            'sad': '#60a5fa',
+            'angry': '#f87171',
+            'fear': '#a78bfa',
+            'neutral': '#94a3b8',
+            'surprise': '#fbbf24',
+            'disgust': '#f472b6'
+        };
+
+        var backgroundColors = labels.map(function(label) {
+            return colors[label] || '#64748b';
+        });
+
+        // Create pie chart
+        var ctx = document.getElementById('emotionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels.map(function(l) {
+                    return l.charAt(0).toUpperCase() + l.slice(1);
+                }),
+                datasets: [{
+                    data: data,
+                    backgroundColor: backgroundColors,
+                    borderColor: '#1e293b',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#e2e8f0',
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Find Match function
+        function findMatch() {
+            fetch('/find-match')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.matched) {
+                        window.location.href = data.redirect;
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(function(err) {
+                    console.error(err);
+                    alert('Error finding match');
+                });
+        }
+    </script>
+    {% endif %}
+
+</body>
+</html>
+

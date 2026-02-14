@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auto Emotion Detection - EchoBridge</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            background: #0f172a;
+            color: #ffffff;
+            text-align: center;
+            font-family: 'Inter', sans-serif;
+            padding-top: 80px;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 30px;
+        }
+
+        .camera-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        video {
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 22px;
+            margin: 8px;
+            background: #ffffff;
+            color: #0f172a;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            background: #e2e8f0;
+        }
+
+        #result {
+            margin-top: 30px;
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        .confidence-bar {
+            width: 300px;
+            height: 8px;
+            background: #1e293b;
+            border-radius: 6px;
+            margin: 15px auto;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffffff, #94a3b8);
+            transition: width 0.5s ease;
+        }
+
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Auto Emotion Detection</h1>
+
+<div class="camera-container">
+    <video id="video" width="480" height="360" autoplay></video>
+    <canvas id="canvas" width="480" height="360" style="display:none;"></canvas>
+</div>
+
+<div class="controls">
+    <button onclick="capture()">Detect Once</button>
+    <button onclick="startAuto()">Start Auto</button>
+    <button onclick="stopAuto()">Stop Auto</button>
+</div>
+
+<div id="result"></div>
+
+<div class="confidence-bar">
+    <div id="confidenceFill" class="confidence-fill"></div>
+</div>
+
+<div class="status" id="status">Camera initializing...</div>
+
+<script>
+
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const context = canvas.getContext('2d');
+const resultDiv = document.getElementById("result");
+const confidenceFill = document.getElementById("confidenceFill");
+const statusText = document.getElementById("status");
+
+let autoInterval = null;
+
+// 🎥 Open camera
+navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+        video.srcObject = stream;
+        statusText.innerHTML = "Camera ready";
+    })
+    .catch(err => {
+        statusText.innerHTML = "Camera access denied";
+        alert("Camera access denied");
+    });
+
+// 🔥 Capture and Send to Backend
+function capture() {
+
+    context.drawImage(video, 0, 0, 480, 360);
+    const imageData = canvas.toDataURL("image/jpeg");
+
+    statusText.innerHTML = "Detecting emotion...";
+
+    fetch('/detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageData })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        if (data.error) {
+            resultDiv.innerHTML = data.error;
+            confidenceFill.style.width = "0%";
+            statusText.innerHTML = "Detection failed";
+        } else {
+            resultDiv.innerHTML =
+                "Emotion: <b>" + data.emotion + "</b><br>" +
+                "<span style='font-size: 16px; color: #94a3b8;'>" + data.message + "</span>";
+
+            confidenceFill.style.width = data.confidence + "%";
+            
+            // Display matching status
+            if (data.matched) {
+                statusText.innerHTML = "Confidence: " + data.confidence + "%<br>" +
+                    "<span style='color: #4ade80;'>✓ You've been matched! Redirecting to chat...</span>";
+                // Redirect to chat after a short delay
+                setTimeout(function() {
+                    window.location.href = "/find-match";
+                }, 1500);
+            } else {
+                statusText.innerHTML = "Confidence: " + data.confidence + "%<br>" +
+                    "<span style='color: #fbbf24;'>" + data.message_match + "</span>";
+            }
+        }
+    })
+    .catch(error => {
+        console.error(error);
+        statusText.innerHTML = "Server error";
+    });
+}
+
+// 🔥 Start Real-Time Auto Detection
+function startAuto() {
+    if (!autoInterval) {
+        autoInterval = setInterval(capture, 3000);
+        statusText.innerHTML = "Auto detection started";
+    }
+}
+
+// 🔥 Stop Auto Detection
+function stopAuto() {
+    if (autoInterval) {
+        clearInterval(autoInterval);
+        autoInterval = null;
+        statusText.innerHTML = "Auto detection stopped";
+    }
+}
+
+</script>
+
+</body>
+</html>

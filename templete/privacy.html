@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - EchoBridge AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='privacy.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <span class="logo-icon"></span>
+                EchoBridge
+            </a>
+            <button class="nav-toggle" id="navToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="/">Home</a></li>
+                <li><a href="#what-we-collect">Data We Collect</a></li>
+                <li><a href="#how-we-use">How We Use</a></li>
+                <li><a href="#camera-usage">Camera</a></li>
+                <li><a href="#security">Security</a></li>
+                <li><a href="#rights">Your Rights</a></li>
+                <li><a href="#ai-transparency">AI Transparency</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+            <div class="nav-right">
+                <div class="lang-dropdown-container">
+                    <button class="lang-btn" id="langBtn">
+                        <span class="lang-icon"></span>
+                        <span class="lang-current" id="currentLang">English</span>
+                        <span class="lang-arrow"></span>
+                    </button>
+                    <div class="lang-dropdown" id="langDropdown">
+                        <div class="lang-option" data-lang="en">
+                            <span class="lang-name">English</span>
+                        </div>
+                        <div class="lang-option" data-lang="es">
+                            <span class="lang-name">Espanol</span>
+                        </div>
+                        <div class="lang-option" data-lang="fr">
+                            <span class="lang-name">Francais</span>
+                        </div>
+                        <div class="lang-option" data-lang="de">
+                            <span class="lang-name">Deutsch</span>
+                        </div>
+                        <div class="lang-option" data-lang="zh">
+                            <span class="lang-name">Chinese</span>
+                        </div>
+                        <div class="lang-option" data-lang="ja">
+                            <span class="lang-name">Japanese</span>
+                        </div>
+                        <div class="lang-option" data-lang="hi">
+                            <span class="lang-name">Hindi</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="hero-title">Privacy First. Always.</h1>
+            <p class="hero-subtitle">Your trust is the foundation of everything we build. We believe emotional connection shouldn't come at the cost of your privacy.</p>
+            <div class="hero-badges">
+                <span class="badge">No Facial Recognition</span>
+                <span class="badge">No Photo Storage</span>
+                <span class="badge">Your Data, Your Control</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- What Data We Collect -->
+    <section class="section" id="what-we-collect">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-tag">Data Collection</span>
+                <h2 class="section-title">What Data We Collect</h2>
+                <p class="section-desc">We collect only what's necessary to provide emotional connection services.</p>
+            </div>
+            <div class="cards-grid">
+                <div class="card reveal">
+                    <div class="card-icon"></div>
+                    <h3>Emotion Labels</h3>
+                    <p>Emotion categories detected from your facial expressions: Happy, Sad, Angry, Fearful, Surprised, Disgusted, Neutral, or Contemptuous.</p>
+                </div>
+                <div class="card reveal">
+                    <div class="card-icon"></div>
+                    <h3>Confidence Score</h3>
+                    <p>Our AI provides a confidence percentage for each emotion detection to ensure accurate matching.</p>
+                </div>
+                <div class="card reveal">
+                    <div class="card-icon"></div>
+                    <h3>Anonymous Session ID</h3>
+                    <p>A random identifier generated for each session. No personal information is linked to this ID.</p>
+                </div>
+                <div class="card reveal">
+                    <div class="card-icon"></div>
+                    <h3>Chat Messages</h3>
+                    <p>Temporary message content during active sessions. Messages are not stored after session ends.</p>
+                </div>
+            </div>
+            <div class="highlight-box reveal">
+                <div class="highlight-icon"></div>
+                <div class="highlight-content">
+                    <h4>What We DON'T Collect</h4>
+                    <ul>
+                        <li>No photos or videos stored</li>
+                        <li>No facial recognition (identity identification)</li>
+                        <li>No biometric identity storage</li>
+                        <li>No personal identifiers linked to emotions</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How We Use Data -->
+    <section class="section section-alt" id="how-we-use">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-tag">Data Usage</span>
+                <h2 class="section-title">How We Use Your Data</h2>
+                <p class="section-desc">Your data serves only to enhance your emotional connection experience.</p>
+            </div>
+            <div class="usage-grid">
+                <div class="usage-item reveal">
+                    <div class="usage-number">01</div>
+                    <h3>Emotional Matching</h3>
+                    <p>We use emotion labels to connect you with people who share similar emotional states, fostering genuine understanding and support.</p>
+                </div>
+                <div class="usage-item reveal">
+                    <div class="usage-number">02</div>
+                    <h3>AI Performance</h3>
+                    <p>Aggregated, anonymized data helps us improve our emotion detection accuracy without compromising individual privacy.</p>
+                </div>
+                <div class="usage-item reveal">
+                    <div class="usage-number">03</div>
+                    <h3>Anonymous Analytics</h3>
+                    <p>We analyze usage patterns to improve our service—all data is anonymized and cannot be traced back to individuals.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Camera & Facial Data Usage -->
+    <section class="section" id="camera-usage">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-tag">Camera Access</span>
+                <h2 class="section-title">Camera & Facial Data Usage</h2>
+                <p class="section-desc">Your camera is optional, and your privacy is always protected.</p>
+            </div>
+            <div class="camera-grid">
+                <div class="camera-card reveal">
+                    <div class="camera-icon"></div>
+                    <h3>Camera Access is Optional</h3>
+                    <p>You choose whether to enable camera access. Emotion detection works equally well with our manual emotion selection mode.</p>
+                </div>
+                <div class="camera-card reveal">
+                    <div class="camera-icon"></div>
+                    <h3>Real-Time Processing Only</h3>
+                    <p>Facial expressions are analyzed in real-time during your session. Frames are processed instantly and discarded immediately.</p>
+                </div>
+                <div class="camera-card reveal">
+                    <div class="camera-icon"></div>
+                    <h3>No Image or Video Storage</h3>
+                    <p>Zero photos or videos are saved to our servers. What happens on your device stays on your device.</p>
+                </div>
+                <div class="camera-card reveal">
+                    <div class="camera-icon"></div>
+                    <h3>Emotion Classification Only</h3>
+                    <p>Our AI identifies emotional states, not identities. We cannot and do not attempt to recognize or identify individuals.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Data Security -->
+    <section class="section section-alt" id="security">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-tag">Security</span>
+                <h2 class="section-title">Data Security</h2>
+                <p class="section-desc">Your trust deserves enterprise-grade protection.</p>
+            </div>
+            <div class="security-features">
+                <div class="security-item reveal">
+                    <div class="security-icon"></div>
+                    <h3>Encrypted Communication</h3>
+                    <p>All data transmission uses HTTPS/TLS encryption. Your connections are secure from eavesdropping.</p>
+                </div>
+                <div class="security-item reveal">
+                    <div class="security-icon"></div>
+                    <h3>Secure Backend Processing</h3>
+                    <p>Our servers process data in isolated, secure environments with strict access controls and monitoring.</p>
+                </div>
+                <div class="security-item reveal">
+                    <div class="security-icon"></div>
+                    <h3>No Third-Party Data Selling</h3>
+                    <p>We never sell, rent, or share your personal data with advertisers or data brokers. Your data is yours.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- User Rights -->
+    <section class="section" id="rights">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-tag">Your Control</span>
+                <h2 class="section-title">Your Rights</h2>
+                <p class="section-desc">You have complete control over your data and experience.</p>
+            </div>
+            <div class="rights-grid">
+                <div class="right-card reveal">
+                    <div class="right-icon"></div>
+                    <h3>Disable Camera Anytime</h3>
+                    <p>Turn off camera access in your browser settings at any time. Use manual emotion selection instead.</p>
+                </div>
+                <div class="right-card reveal">
+                    <div class="right-icon"></div>
+                    <h3>Manual Emotion Mode</h3>
+                    <p>Select your emotions manually without camera access. Full functionality without facial analysis.</p>
+                </div>
+                <div class="right-card reveal">
+                    <div class="right-icon"></div>
+                    <h3>Logout Anytime</h3>
+                    <p>End your session instantly. All session data is cleared upon logout.</p>
+                </div>
+                <div class="right-card reveal">
+                    <div class="right-icon"></div>
+                    <h3>Delete Data Option</h3>
+                    <p>Request data deletion anytime. We'll remove all associated data within 30 days.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI Transparency -->
+    <section class="section section-alt" id="ai-transparency">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-tag">AI Transparency</span>
+                <h2 class="section-title">Our AI Commitment</h2>
+                <p class="section-desc">We believe in honest, ethical AI development.</p>
+            </div>
+            <div class="ai-content reveal">
+                <div class="ai-badge">
+                    <div class="ai-badge-icon"></div>
+                    <div>
+                        <h4>Powered by Pretrained Models</h4>
+                        <p>Our emotion detection uses state-of-the-art pretrained models from Hugging Face, proven and trusted by millions.</p>
+                    </div>
+                </div>
+                <div class="ai-badge ai-badge-warning">
+                    <div class="ai-badge-icon"></div>
+                    <div>
+                        <h4>No Model Training on Your Data</h4>
+                        <p>We do NOT use your facial images to train or improve our AI models. Your expressions are never used for model training.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Responsible AI Disclaimer -->
+    <section class="section">
+        <div class="container">
+            <div class="disclaimer-box reveal">
+                <div class="disclaimer-icon"></div>
+                <h3>Responsible AI Disclaimer</h3>
+                <div class="disclaimer-content">
+                    <div class="disclaimer-item">
+                        <div class="disclaimer-cross"></div>
+                        <div>
+                            <strong>Not a Medical Diagnostic Tool</strong>
+                            <p>EchoBridge is not designed or validated for medical purposes. It should not be used as a diagnostic tool for any medical or psychological conditions.</p>
+                        </div>
+                    </div>
+                    <div class="disclaimer-item">
+                        <div class="disclaimer-cross"></div>
+                        <div>
+                            <strong>Not a Mental Health Replacement</strong>
+                            <p>Our platform is not a substitute for professional mental health care. If you're experiencing mental health concerns, please consult a qualified healthcare provider.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="section section-alt" id="contact">
+        <div class="container">
+            <div class="section-header reveal">
+                <span class="section-tag">Get in Touch</span>
+                <h2 class="section-title">Contact Us</h2>
+                <p class="section-desc">Questions? We'd love to hear from you.</p>
+            </div>
+            <div class="contact-grid">
+                <div class="contact-card reveal">
+                    <div class="contact-icon"></div>
+                    <h3>Email Support</h3>
+                    <p>support@echobridge.ai</p>
+                    <span class="contact-desc">We'll respond within 24 hours</span>
+                </div>
+                <div class="contact-card reveal">
+                    <div class="contact-icon"></div>
+                    <h3>Business Inquiries</h3>
+                    <p>partnerships@echobridge.ai</p>
+                    <span class="contact-desc">For collaborations</span>
+                </div>
+                <div class="contact-card reveal">
+                    <div class="contact-icon"></div>
+                    <h3>Privacy Concerns</h3>
+                    <p>privacy@echobridge.ai</p>
+                    <span class="contact-desc">Dedicated privacy team</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-main">
+                <div class="footer-brand">
+                    <a href="/" class="footer-logo">
+                        <span class="logo-icon"></span>
+                        EchoBridge
+                    </a>
+                    <p>Connecting humans beyond words through emotion-aware AI.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>Product</h4>
+                        <a href="/">Home</a>
+                        <a href="#how-it-works">How It Works</a>
+                        <a href="#features">Features</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Legal</h4>
+                        <a href="/privacy">Privacy Policy</a>
+                        <a href="#">Terms of Service</a>
+                        <a href="#">Cookie Policy</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Connect</h4>
+                        <a href="#contact">Contact Us</a>
+                        <a href="#">Twitter</a>
+                        <a href="#">GitHub</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>Last Updated: February 2026</p>
+                <p>2026 EchoBridge AI. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='privacy.js') }}"></script>
+</body>
+</html>
+
