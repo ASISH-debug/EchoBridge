@@ -17,13 +17,17 @@ import io
 client = None
 
 def get_openai_client():
-    """Get OpenAI client with API key from environment"""
+    """Get OpenAI client with API key from environment - safe implementation"""
     global client
     if client is None:
         api_key = os.environ.get("OPENAI_API_KEY")
         if api_key:
-            from openai import OpenAI
-            client = OpenAI(api_key=api_key)
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=api_key)
+            except Exception as e:
+                print(f"⚠️ OpenAI client initialization failed: {e}")
+                client = None
     return client
 
 
@@ -38,7 +42,9 @@ app.secret_key = os.urandom(24)
 # =======================
 
 def init_db():
-    conn = sqlite3.connect('database.db')
+    # Use absolute path for Render deployment
+    db_path = os.path.join(os.getcwd(), "database.db")
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
 
     c.execute('''CREATE TABLE IF NOT EXISTS users (
@@ -85,7 +91,9 @@ def hash_password(password):
 
 
 def get_db():
-    conn = sqlite3.connect('database.db')
+    # Use absolute path for Render deployment
+    db_path = os.path.join(os.getcwd(), "database.db")
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -222,7 +230,7 @@ _model_loaded = False
 
 def get_model():
     """
-    Lazy load the model only when needed.
+    Lazy load the model only when needed from HuggingFace hub.
     This prevents crashes at startup and ensures model loads only once.
     """
     global _model, _processor, _model_loaded
@@ -234,15 +242,17 @@ def get_model():
         # Reduce memory usage for free tier
         torch.set_num_threads(1)
         
-        model_path = "./model"
+        # Load from HuggingFace hub - no local files needed
+        model_name = "trpakov/vit-face-expression"
         
-        # Load with memory optimizations
+        print(f"📥 Loading model from HuggingFace: {model_name}")
+        
         _processor = AutoImageProcessor.from_pretrained(
-            model_path,
+            model_name,
             use_fast=True
         )
         _model = AutoModelForImageClassification.from_pretrained(
-            model_path,
+            model_name,
             torch_dtype=torch.float32,  # Use CPU float32 (avoid GPU memory)
             low_cpu_mem_usage=True      # Reduce memory during loading
         )
@@ -263,6 +273,14 @@ def get_model():
 # =======================
 # 🌐 ROUTES
 # =======================
+
+# Global error handler
+@app.errorhandler(Exception)
+def handle_error(e):
+    """Handle all unhandled exceptions"""
+    print(f"❌ Global error handler caught: {str(e)}")
+    return "Internal Server Error", 500
+
 
 @app.route('/')
 def index():
@@ -289,55 +307,63 @@ def manual():
 @app.route('/manual-save', methods=['POST'])
 @login_required
 def manual_save():
-    data = request.get_json()
-    emotion = data.get('emotion')
-    intensity = data.get('intensity', 2)
-    
-    if emotion:
-        conn = get_db()
-        conn.execute(
-            "INSERT INTO emotions (user_id, emotion, confidence) VALUES (?, ?, ?)",
-            (session['user_id'], emotion, intensity * 33.33)
-        )
-        conn.commit()
-        conn.close()
+    try:
+        data = request.get_json()
+        emotion = data.get('emotion')
+        intensity = data.get('intensity', 2)
         
-        # Find emotion match
-        matched_user_id, matched_username = find_emotion_match(session['user_id'], emotion)
+        if emotion:
+            conn = get_db()
+            conn.execute(
+                "INSERT INTO emotions (user_id, emotion, confidence) VALUES (?, ?, ?)",
+                (session['user_id'], emotion, intensity * 33.33)
+            )
+            conn.commit()
+            conn.close()
+            
+            # Find emotion match
+            matched_user_id, matched_username = find_emotion_match(session['user_id'], emotion)
+            
+            if matched_user_id:
+                # Create match record
+                create_match(session['user_id'], matched_user_id, emotion)
+                return jsonify({
+                    "success": True,
+                    "message": "Emotion saved!",
+                    "matched": True,
+                    "matched_user": matched_username,
+                    "emotion": emotion
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "message": "Emotion saved!",
+                    "matched": False,
+                    "message_match": "Waiting for someone with similar emotion...",
+                    "emotion": emotion
+                })
         
-        if matched_user_id:
-            # Create match record
-            create_match(session['user_id'], matched_user_id, emotion)
-            return jsonify({
-                "success": True,
-                "message": "Emotion saved!",
-                "matched": True,
-                "matched_user": matched_username,
-                "emotion": emotion
-            })
-        else:
-            return jsonify({
-                "success": True,
-                "message": "Emotion saved!",
-                "matched": False,
-                "message_match": "Waiting for someone with similar emotion...",
-                "emotion": emotion
-            })
-    
-    return jsonify({"error": "No emotion selected"}), 400
+        return jsonify({"error": "No emotion selected"}), 400
+    except Exception as e:
+        print(f"❌ manual_save error: {str(e)}")
+        return jsonify({"error": "Something went wrong"}), 500
 
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    conn = get_db()
-    emotions = conn.execute(
-        "SELECT emotion, confidence, created_at FROM emotions WHERE user_id = ? ORDER BY created_at DESC",
-        (session['user_id'],)
-    ).fetchall()
-    conn.close()
+    try:
+        conn = get_db()
+        emotions = conn.execute(
+            "SELECT emotion, confidence, created_at FROM emotions WHERE user_id = ? ORDER BY created_at DESC",
+            (session['user_id'],)
+        ).fetchall()
+        conn.close()
 
-    return render_template('dashboard.html', emotions=emotions)
+        return render_template('dashboard.html', emotions=emotions)
+    except Exception as e:
+        print(f"❌ dashboard error: {str(e)}")
+        return "Internal Server Error", 500
 
 
 # =======================
@@ -346,47 +372,55 @@ def dashboard():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+    try:
+        if request.method == 'POST':
+            email = request.form.get('email')
+            password = request.form.get('password')
 
-        hashed_password = hash_password(password)
+            hashed_password = hash_password(password)
 
-        conn = get_db()
-        user = conn.execute(
-            'SELECT * FROM users WHERE email = ? AND password = ?',
-            (email, hashed_password)
-        ).fetchone()
-        conn.close()
+            conn = get_db()
+            user = conn.execute(
+                'SELECT * FROM users WHERE email = ? AND password = ?',
+                (email, hashed_password)
+            ).fetchone()
+            conn.close()
 
-        if user:
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            return redirect(url_for('dashboard'))
+            if user:
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                return redirect(url_for('dashboard'))
 
-        flash("Invalid credentials")
+            flash("Invalid credentials")
 
-    return render_template('login.html')
+        return render_template('login.html')
+    except Exception as e:
+        print(f"❌ login error: {str(e)}")
+        return "Internal Server Error", 500
 
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        username = request.form.get('username')
-        password = hash_password(request.form.get('password'))
+    try:
+        if request.method == 'POST':
+            email = request.form.get('email')
+            username = request.form.get('username')
+            password = hash_password(request.form.get('password'))
 
-        conn = get_db()
-        conn.execute(
-            'INSERT INTO users (email, username, password) VALUES (?, ?, ?)',
-            (email, username, password)
-        )
-        conn.commit()
-        conn.close()
+            conn = get_db()
+            conn.execute(
+                'INSERT INTO users (email, username, password) VALUES (?, ?, ?)',
+                (email, username, password)
+            )
+            conn.commit()
+            conn.close()
 
-        return redirect(url_for('login'))
+            return redirect(url_for('login'))
 
-    return render_template('signup.html')
+        return render_template('signup.html')
+    except Exception as e:
+        print(f"❌ signup error: {str(e)}")
+        return "Internal Server Error", 500
 
 
 @app.route('/logout')
@@ -501,37 +535,41 @@ def detect_emotion():
 @login_required
 def match_status():
     """Check if user has a recent match"""
-    conn = get_db()
-    
-    # Get the most recent match for this user
-    match = conn.execute('''
-        SELECT m.id, m.emotion, m.created_at, 
-               CASE 
-                   WHEN m.user1_id = ? THEN u2.username 
-                   ELSE u1.username 
-               END as matched_username
-        FROM matches m
-        JOIN users u1 ON m.user1_id = u1.id
-        JOIN users u2 ON m.user2_id = u2.id
-        WHERE m.user1_id = ? OR m.user2_id = ?
-        ORDER BY m.created_at DESC
-        LIMIT 1
-    ''', (session['user_id'], session['user_id'], session['user_id'])).fetchone()
-    
-    conn.close()
-    
-    if match:
-        return jsonify({
-            "matched": True,
-            "matched_user": match['matched_username'],
-            "emotion": match['emotion'],
-            "created_at": match['created_at']
-        })
-    else:
-        return jsonify({
-            "matched": False,
-            "message": "No recent match found"
-        })
+    try:
+        conn = get_db()
+        
+        # Get the most recent match for this user
+        match = conn.execute('''
+            SELECT m.id, m.emotion, m.created_at, 
+                   CASE 
+                       WHEN m.user1_id = ? THEN u2.username 
+                       ELSE u1.username 
+                   END as matched_username
+            FROM matches m
+            JOIN users u1 ON m.user1_id = u1.id
+            JOIN users u2 ON m.user2_id = u2.id
+            WHERE m.user1_id = ? OR m.user2_id = ?
+            ORDER BY m.created_at DESC
+            LIMIT 1
+        ''', (session['user_id'], session['user_id'], session['user_id'])).fetchone()
+        
+        conn.close()
+        
+        if match:
+            return jsonify({
+                "matched": True,
+                "matched_user": match['matched_username'],
+                "emotion": match['emotion'],
+                "created_at": match['created_at']
+            })
+        else:
+            return jsonify({
+                "matched": False,
+                "message": "No recent match found"
+            })
+    except Exception as e:
+        print(f"❌ match_status error: {str(e)}")
+        return jsonify({"error": "Something went wrong"}), 500
 
 
 # =======================
@@ -542,146 +580,166 @@ def match_status():
 @login_required
 def find_match():
     """Manually trigger matching logic"""
-    # Check if user already has an active match
-    active_match = get_user_active_match(session['user_id'])
-    
-    if active_match:
-        # User already has an active match, redirect to chat
-        return jsonify({
-            "matched": True,
-            "match_id": active_match['id'],
-            "emotion": active_match['emotion'],
-            "redirect": url_for('chat', match_id=active_match['id'])
-        })
-    
-    # Get user's latest emotion
-    conn = get_db()
-    latest_emotion = conn.execute('''
-        SELECT emotion FROM emotions 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC 
-        LIMIT 1
-    ''', (session['user_id'],)).fetchone()
-    conn.close()
-    
-    if not latest_emotion:
-        return jsonify({
-            "matched": False,
-            "message": "No emotion detected yet. Please detect your emotion first."
-        })
-    
-    emotion = latest_emotion['emotion']
-    
-    # Try to find a match
-    matched_user_id, matched_username = find_emotion_match(session['user_id'], emotion)
-    
-    if matched_user_id:
-        # Create match
-        match_id = create_match(session['user_id'], matched_user_id, emotion)
-        return jsonify({
-            "matched": True,
-            "match_id": match_id,
-            "emotion": emotion,
-            "redirect": url_for('chat', match_id=match_id)
-        })
-    else:
-        return jsonify({
-            "matched": False,
-            "message": "Looking for someone who feels the same..."
-        })
+    try:
+        # Check if user already has an active match
+        active_match = get_user_active_match(session['user_id'])
+        
+        if active_match:
+            # User already has an active match, redirect to chat
+            return jsonify({
+                "matched": True,
+                "match_id": active_match['id'],
+                "emotion": active_match['emotion'],
+                "redirect": url_for('chat', match_id=active_match['id'])
+            })
+        
+        # Get user's latest emotion
+        conn = get_db()
+        latest_emotion = conn.execute('''
+            SELECT emotion FROM emotions 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''', (session['user_id'],)).fetchone()
+        conn.close()
+        
+        if not latest_emotion:
+            return jsonify({
+                "matched": False,
+                "message": "No emotion detected yet. Please detect your emotion first."
+            })
+        
+        emotion = latest_emotion['emotion']
+        
+        # Try to find a match
+        matched_user_id, matched_username = find_emotion_match(session['user_id'], emotion)
+        
+        if matched_user_id:
+            # Create match
+            match_id = create_match(session['user_id'], matched_user_id, emotion)
+            return jsonify({
+                "matched": True,
+                "match_id": match_id,
+                "emotion": emotion,
+                "redirect": url_for('chat', match_id=match_id)
+            })
+        else:
+            return jsonify({
+                "matched": False,
+                "message": "Looking for someone who feels the same..."
+            })
+    except Exception as e:
+        print(f"❌ find_match error: {str(e)}")
+        return jsonify({"error": "Something went wrong"}), 500
 
 
 @app.route('/chat/<int:match_id>')
 @login_required
 def chat(match_id):
     """Render the anonymous chat page"""
-    # Validate match access
-    if not validate_match_access(session['user_id'], match_id):
-        flash("Invalid chat session")
-        return redirect(url_for('dashboard'))
-    
-    # Get match details
-    conn = get_db()
-    match = conn.execute('''
-        SELECT m.*, 
-               CASE 
-                   WHEN m.user1_id = ? THEN u2.username 
-                   ELSE u1.username 
-               END as matched_username
-        FROM matches m
-        JOIN users u1 ON m.user1_id = u1.id
-        JOIN users u2 ON m.user2_id = u2.id
-        WHERE m.id = ?
-    ''', (session['user_id'], match_id)).fetchone()
-    conn.close()
-    
-    if not match:
-        flash("Chat not found")
-        return redirect(url_for('dashboard'))
-    
-    return render_template('chat.html', match=match)
+    try:
+        # Validate match access
+        if not validate_match_access(session['user_id'], match_id):
+            flash("Invalid chat session")
+            return redirect(url_for('dashboard'))
+        
+        # Get match details
+        conn = get_db()
+        match = conn.execute('''
+            SELECT m.*, 
+                   CASE 
+                       WHEN m.user1_id = ? THEN u2.username 
+                       ELSE u1.username 
+                   END as matched_username
+            FROM matches m
+            JOIN users u1 ON m.user1_id = u1.id
+            JOIN users u2 ON m.user2_id = u2.id
+            WHERE m.id = ?
+        ''', (session['user_id'], match_id)).fetchone()
+        conn.close()
+        
+        if not match:
+            flash("Chat not found")
+            return redirect(url_for('dashboard'))
+        
+        return render_template('chat.html', match=match)
+    except Exception as e:
+        print(f"❌ chat error: {str(e)}")
+        return "Internal Server Error", 500
 
 
 @app.route('/send-message', methods=['POST'])
 @login_required
 def send_message():
     """Send a message in a chat"""
-    data = request.get_json()
-    match_id = data.get('match_id')
-    message = data.get('message', '').strip()
-    
-    if not message:
-        return jsonify({"error": "Empty message"}), 400
-    
-    if not match_id:
-        return jsonify({"error": "No match_id provided"}), 400
-    
-    # Validate match access
-    if not validate_match_access(session['user_id'], match_id):
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    # Save message
-    save_message(match_id, session['user_id'], message)
-    
-    return jsonify({"success": True})
+    try:
+        data = request.get_json()
+        match_id = data.get('match_id')
+        message = data.get('message', '').strip()
+        
+        if not message:
+            return jsonify({"error": "Empty message"}), 400
+        
+        if not match_id:
+            return jsonify({"error": "No match_id provided"}), 400
+        
+        # Validate match access
+        if not validate_match_access(session['user_id'], match_id):
+            return jsonify({"error": "Unauthorized"}), 403
+        
+        # Save message
+        save_message(match_id, session['user_id'], message)
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"❌ send_message error: {str(e)}")
+        return jsonify({"error": "Something went wrong"}), 500
 
 
 @app.route('/get-messages/<int:match_id>')
 @login_required
 def get_messages_route(match_id):
     """Get messages for a match (for polling)"""
-    # Validate match access
-    if not validate_match_access(session['user_id'], match_id):
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    messages = get_messages(match_id)
-    
-    # Format messages with sender info
-    formatted_messages = []
-    for msg in messages:
-        formatted_messages.append({
-            "id": msg['id'],
-            "sender_id": msg['sender_id'],
-            "message": msg['message'],
-            "created_at": msg['created_at'],
-            "is_me": msg['sender_id'] == session['user_id']
-        })
-    
-    return jsonify({"messages": formatted_messages})
+    try:
+        # Validate match access
+        if not validate_match_access(session['user_id'], match_id):
+            return jsonify({"error": "Unauthorized"}), 403
+        
+        messages = get_messages(match_id)
+        
+        # Format messages with sender info
+        formatted_messages = []
+        for msg in messages:
+            formatted_messages.append({
+                "id": msg['id'],
+                "sender_id": msg['sender_id'],
+                "message": msg['message'],
+                "created_at": msg['created_at'],
+                "is_me": msg['sender_id'] == session['user_id']
+            })
+        
+        return jsonify({"messages": formatted_messages})
+    except Exception as e:
+        print(f"❌ get_messages error: {str(e)}")
+        return jsonify({"error": "Something went wrong"}), 500
 
 
 @app.route('/end-chat/<int:match_id>', methods=['POST'])
 @login_required
 def end_chat(match_id):
     """End a chat session"""
-    # Validate match access
-    if not validate_match_access(session['user_id'], match_id):
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    # End the match
-    end_match(match_id)
-    
-    return jsonify({"success": True, "redirect": url_for('dashboard')})
+    try:
+        # Validate match access
+        if not validate_match_access(session['user_id'], match_id):
+            return jsonify({"error": "Unauthorized"}), 403
+        
+        # End the match
+        end_match(match_id)
+        
+        return jsonify({"success": True, "redirect": url_for('dashboard')})
+    except Exception as e:
+        print(f"❌ end_chat error: {str(e)}")
+        return jsonify({"error": "Something went wrong"}), 500
 
 
 # =======================
@@ -707,66 +765,70 @@ ai_chat_history = {}
 @login_required
 def ai_chat_page():
     """Render the AI chat page"""
-    # Get user's latest emotion
-    conn = get_db()
-    latest_emotion = conn.execute('''
-        SELECT emotion FROM emotions 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC 
-        LIMIT 1
-    ''', (session['user_id'],)).fetchone()
-    conn.close()
-    
-    emotion = latest_emotion['emotion'] if latest_emotion else 'neutral'
-    
-    # Initialize chat history for user if not exists
-    if 'ai_chat' not in session:
-        session['ai_chat'] = []
-    
-    # Get system prompt based on emotion
-    system_prompt = ai_system_prompts.get(emotion, ai_system_prompts['neutral'])
-    
-    return render_template('ai-chat.html', 
-                          emotion=emotion, 
-                          system_prompt=system_prompt,
-                          chat_history=session.get('ai_chat', []))
+    try:
+        # Get user's latest emotion
+        conn = get_db()
+        latest_emotion = conn.execute('''
+            SELECT emotion FROM emotions 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''', (session['user_id'],)).fetchone()
+        conn.close()
+        
+        emotion = latest_emotion['emotion'] if latest_emotion else 'neutral'
+        
+        # Initialize chat history for user if not exists
+        if 'ai_chat' not in session:
+            session['ai_chat'] = []
+        
+        # Get system prompt based on emotion
+        system_prompt = ai_system_prompts.get(emotion, ai_system_prompts['neutral'])
+        
+        return render_template('ai-chat.html', 
+                              emotion=emotion, 
+                              system_prompt=system_prompt,
+                              chat_history=session.get('ai_chat', []))
+    except Exception as e:
+        print(f"❌ ai_chat_page error: {str(e)}")
+        return "Internal Server Error", 500
 
 
 @app.route('/ai-chat', methods=['POST'])
 @login_required
 def ai_chat():
     """AI chatbot endpoint with emotion-aware responses"""
-    # Get OpenAI client with API key from environment
-    client = get_openai_client()
-    
-    if client is None:
-        return jsonify({"error": "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable."}), 500
-    
-    data = request.get_json()
-    user_message = data.get('message', '').strip()
-    
-    if not user_message:
-        return jsonify({"error": "Empty message"}), 400
-    
-    # Get user's latest emotion
-    conn = get_db()
-    latest_emotion = conn.execute('''
-        SELECT emotion FROM emotions 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC 
-        LIMIT 1
-    ''', (session['user_id'],)).fetchone()
-    conn.close()
-    
-    emotion = latest_emotion['emotion'] if latest_emotion else 'neutral'
-    system_prompt = ai_system_prompts.get(emotion, ai_system_prompts['neutral'])
-    
-    # Get API key from environment
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        return jsonify({"error": "OpenAI API key not configured"}), 500
-    
     try:
+        # Get OpenAI client with API key from environment
+        client = get_openai_client()
+        
+        if client is None:
+            return jsonify({"error": "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable."}), 500
+        
+        data = request.get_json()
+        user_message = data.get('message', '').strip()
+        
+        if not user_message:
+            return jsonify({"error": "Empty message"}), 400
+        
+        # Get user's latest emotion
+        conn = get_db()
+        latest_emotion = conn.execute('''
+            SELECT emotion FROM emotions 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''', (session['user_id'],)).fetchone()
+        conn.close()
+        
+        emotion = latest_emotion['emotion'] if latest_emotion else 'neutral'
+        system_prompt = ai_system_prompts.get(emotion, ai_system_prompts['neutral'])
+        
+        # Get API key from environment
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            return jsonify({"error": "OpenAI API key not configured"}), 500
+        
         # Build messages array
         messages = [
             {"role": "system", "content": system_prompt},
@@ -800,7 +862,7 @@ def ai_chat():
         
     except Exception as e:
         print("❌ OpenAI Error:", str(e))
-        return jsonify({"reply": "AI service error."})
+        return jsonify({"error": "AI service error. Please try again."}), 500
 
 
 @app.route('/ai-get-messages')
@@ -906,34 +968,38 @@ default_responses = [
 @login_required
 def chatbot_response():
     """Fake AI chatbot with predefined responses based on emotion"""
-    data = request.get_json()
-    user_message = data.get('message', '').strip()
-    
-    if not user_message:
-        return jsonify({"error": "Empty message"}), 400
-    
-    # Get user's latest emotion from database
-    conn = get_db()
-    latest_emotion = conn.execute('''
-        SELECT emotion FROM emotions 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC 
-        LIMIT 1
-    ''', (session['user_id'],)).fetchone()
-    conn.close()
-    
-    emotion = latest_emotion['emotion'] if latest_emotion else 'neutral'
-    
-    # Get responses based on emotion
-    responses = emotion_responses.get(emotion, default_responses)
-    
-    # Pick a random response
-    selected_response = random.choice(responses)
-    
-    return jsonify({
-        "reply": selected_response,
-        "emotion": emotion
-    })
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '').strip()
+        
+        if not user_message:
+            return jsonify({"error": "Empty message"}), 400
+        
+        # Get user's latest emotion from database
+        conn = get_db()
+        latest_emotion = conn.execute('''
+            SELECT emotion FROM emotions 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''', (session['user_id'],)).fetchone()
+        conn.close()
+        
+        emotion = latest_emotion['emotion'] if latest_emotion else 'neutral'
+        
+        # Get responses based on emotion
+        responses = emotion_responses.get(emotion, default_responses)
+        
+        # Pick a random response
+        selected_response = random.choice(responses)
+        
+        return jsonify({
+            "reply": selected_response,
+            "emotion": emotion
+        })
+    except Exception as e:
+        print(f"❌ chatbot_response error: {str(e)}")
+        return jsonify({"error": "Something went wrong"}), 500
 
 
 # =======================
@@ -942,6 +1008,7 @@ def chatbot_response():
 # Do NOT use app.run() in production - it conflicts with Gunicorn
 
 if __name__ == '__main__':
-    # Local development only
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    # Local development only - Use PORT 10000 for Render compatibility
+    import os
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
