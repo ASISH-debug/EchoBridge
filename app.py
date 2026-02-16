@@ -886,4 +886,7 @@ def chatbot_response():
 # =======================
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=5001)
+    # Use PORT from environment variable (Render provides this)
+    # Default to 5001 for local development
+    port = int(os.environ.get('PORT', 5001))
+    app.run(debug=False, host='0.0.0.0', port=port)
