@@ -13,13 +13,18 @@ import base64
 import io
 
 # 🤖 OpenAI
-try:
-    from openai import OpenAI
-    client = OpenAI()
-    openai_loaded = True
-except ImportError:
-    openai_loaded = False
-    client = None
+
+client = None
+
+def get_openai_client():
+    """Get OpenAI client with API key from environment"""
+    global client
+    if client is None:
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key:
+            from openai import OpenAI
+            client = OpenAI(api_key=api_key)
+    return client
 
 
 app = Flask(__name__,
@@ -731,8 +736,11 @@ def ai_chat_page():
 @login_required
 def ai_chat():
     """AI chatbot endpoint with emotion-aware responses"""
-    if not openai_loaded or client is None:
-        return jsonify({"error": "OpenAI library not installed"}), 500
+    # Get OpenAI client with API key from environment
+    client = get_openai_client()
+    
+    if client is None:
+        return jsonify({"error": "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable."}), 500
     
     data = request.get_json()
     user_message = data.get('message', '').strip()
@@ -935,5 +943,5 @@ def chatbot_response():
 
 if __name__ == '__main__':
     # Local development only
-    port = int(os.environ.get('PORT', 10000))
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
