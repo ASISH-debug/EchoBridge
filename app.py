@@ -208,19 +208,51 @@ def get_messages(match_id):
 
 
 # =======================
-# 🤖 LOAD LOCAL MODEL
+# 🤖 LOAD LOCAL MODEL (Lazy Loading)
 # =======================
+# Global variables for lazy loading
+_model = None
+_processor = None
+_model_loaded = False
 
-try:
-    model_path = "./model"
-    processor = AutoImageProcessor.from_pretrained(model_path)
-    model = AutoModelForImageClassification.from_pretrained(model_path)
-    model.eval()
-    print("✅ HuggingFace model loaded successfully")
-except Exception as e:
-    print("❌ Model loading failed:", e)
-    processor = None
-    model = None
+def get_model():
+    """
+    Lazy load the model only when needed.
+    This prevents crashes at startup and ensures model loads only once.
+    """
+    global _model, _processor, _model_loaded
+    
+    if _model_loaded:
+        return _processor, _model
+    
+    try:
+        # Reduce memory usage for free tier
+        torch.set_num_threads(1)
+        
+        model_path = "./model"
+        
+        # Load with memory optimizations
+        _processor = AutoImageProcessor.from_pretrained(
+            model_path,
+            use_fast=True
+        )
+        _model = AutoModelForImageClassification.from_pretrained(
+            model_path,
+            torch_dtype=torch.float32,  # Use CPU float32 (avoid GPU memory)
+            low_cpu_mem_usage=True      # Reduce memory during loading
+        )
+        _model.eval()
+        
+        _model_loaded = True
+        print("✅ HuggingFace model loaded successfully")
+        
+    except Exception as e:
+        print("❌ Model loading failed:", str(e))
+        _model = None
+        _processor = None
+        _model_loaded = True  # Mark as loaded (even if failed) to prevent retry
+    
+    return _processor, _model
 
 
 # =======================
@@ -376,9 +408,17 @@ emotion_messages = {
 @app.route('/detect', methods=['POST'])
 @login_required
 def detect_emotion():
-
+    """Detect emotion from uploaded image with full error handling"""
+    
+    # Use lazy loading to get model
+    processor, model = get_model()
+    
     if model is None or processor is None:
-        return jsonify({"error": "Model not loaded"}), 500
+        print("⚠️ Model not available, returning graceful error")
+        return jsonify({
+            "error": "Emotion detection temporarily unavailable. Please try manual selection.",
+            "fallback": True
+        }), 503
 
     data = request.get_json()
 
@@ -386,6 +426,7 @@ def detect_emotion():
         return jsonify({"error": "No image received"}), 400
 
     try:
+        # Decode and process image
         image_data = data["image"].split(",")[1]
         image_bytes = base64.b64decode(image_data)
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -439,8 +480,12 @@ def detect_emotion():
             })
 
     except Exception as e:
-        print("❌ Detection Error:", e)
-        return jsonify({"error": "Detection failed"}), 500
+        print("❌ Detection Error:", str(e))
+        # Return graceful error instead of crashing
+        return jsonify({
+            "error": "Detection failed. Please try again or use manual selection.",
+            "fallback": True
+        }), 500
 
 
 # =======================
@@ -885,8 +930,10 @@ def chatbot_response():
 
 # =======================
 
+# Production: Gunicorn handles the server (defined in Procfile/render.yaml)
+# Do NOT use app.run() in production - it conflicts with Gunicorn
+
 if __name__ == '__main__':
-    # Use PORT from environment variable (Render provides this)
-    # Default to 5001 for local development
-    port = int(os.environ.get('PORT', 5001))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    # Local development only
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
